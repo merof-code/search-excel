@@ -1,0 +1,23 @@
+// this line, starting with double backslash (/) will be ignored
+//
+// first you configure min file size, then file list file name 
+//
+// the first line should always remain, threshold= and be set 
+// with a number of bytes, files smaller then that will be ignored` 
+threshold=5000
+//
+// file list file name
+//
+file_list_file_name=files_to_search.efu
+//
+// output filename, the program will add csv to the end anyway
+//
+output_csv=output_csv
+//
+// then go the string to search for, separated by newline
+//
+32
+project
+other project
+third project
+maybe

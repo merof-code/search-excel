@@ -20,14 +20,16 @@ def attempt_read(file_path, engine):
 
 def search_in_file(file_path, search_texts):
     # Determine the engine based on file extension
-    if file_path.endswith('.xlsx'):
-        primary_engine = 'openpyxl'
-        secondary_engine = 'xlrd'
-    elif file_path.endswith('.xls'):
+    if file_path.endswith('.xls'):
         primary_engine = 'xlrd'
         secondary_engine = 'openpyxl'
+    elif file_path.endswith('.xlsx'):
+        primary_engine = 'openpyxl'
+        secondary_engine = 'xlrd'
     else:
-        raise ValueError("Unsupported file format")
+        primary_engine = 'openpyxl'
+        secondary_engine = 'xlrd'
+        print(f"***{file_path} is unsupported, will attempt to read anyway ***")
     
     df_string, first_error = attempt_read(file_path, primary_engine)
     if first_error:
@@ -67,6 +69,7 @@ def search_excel_files(csv_file, search_texts, size_threshold = 1000):
     workers = cpu_cores * 2
     print(f"using {workers} workers")
     with ThreadPoolExecutor(max_workers=workers) as executor:  
+        # futures = {executor.submit(search_in_file, file['Filename'], search_texts): file for file in filenames if file['Filename'].endswith(('.xlsx', '.xls'))}
       futures = {executor.submit(search_in_file, file['Filename'], search_texts): file for file in filenames}
       start_time = time.time()
       completed_files = 0
@@ -81,13 +84,10 @@ def search_excel_files(csv_file, search_texts, size_threshold = 1000):
         completed_files += 1
         completed_size += file['Size']
         elapsed_time = time.time() - start_time
-
-        # Adjust the estimations to account for file size
-        avg_time_per_size = elapsed_time / completed_size if completed_size else 0
-        estimated_total_time = avg_time_per_size * total_size
+        
         percent_done = (completed_size / total_size) * 100
-        filename = file_path.split('/')[-1].split('\\')[-1]
-        print(f"file {filename} {completed_files}/{total_files} files ({percent_done:.2f}% done). Time total {elapsed_time:.2f}")
+        filename = file['Filename'].split('/')[-1].split('\\')[-1]
+        print(f"{completed_files}/{total_files} files ({percent_done:.2f}% done). Time total {elapsed_time:.2f} {filename}")
     return results
   
 def is_file_writable(file_path):
@@ -143,10 +143,32 @@ def write_results_to_csv(results, search_texts, output_csv, encoding = 'utf-8'):
         print(f"Total files with hits {hits_count}, files with errors {errors_count}, total lines {total_lines}")
 
 
-file_size_threshold = 5000 # in bytes 
-file_name = 'files_to_search.efu'
-keywords = ['32', 'project', 'other project', 'third project', 'maybe']
-results = search_excel_files(file_name, keywords, file_size_threshold)
+def read_config(file_name):
+    with open(file_name, 'r') as file:
+        lines = file.readlines()
+        
+    # Remove lines starting with //
+    lines = [line for line in lines if not line.strip().startswith("//")]
+    threshold_line = lines[0].strip()
+    threshold = int(threshold_line.split('=')[1])
+    file_list_file_name_line = lines[1].strip()
+    file_list_file_name = file_list_file_name_line.split('=')[1]
+    output_csv_line = lines[2].strip()
+    output_csv= output_csv_line.split('=')[1]
+    keywords = [line.strip() for line in lines[3:]]
+
+    return threshold, file_list_file_name, output_csv, keywords
+
+# read input
+config_file_name = 'search_config.txt'
+file_size_threshold, file_list_file_name, output_csv, keywords = read_config(config_file_name)
+output_csv = output_csv + ".csv"
+
+print(f"reading from: {file_list_file_name}, exporting to {output_csv}")
+print(f"files bigger then {file_size_threshold}")
+print(f"with keywords: {keywords}")
+
+# the program itself
+results = search_excel_files(file_list_file_name, keywords, file_size_threshold)
 print("search done")
-output_csv = 'output_results.csv'
 write_results_to_csv(results, keywords, output_csv, 'utf-8-sig')
