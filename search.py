@@ -12,11 +12,15 @@ warnings.filterwarnings("ignore", message="Workbook contains no default style, a
 warnings.filterwarnings("ignore", message="Cannot parse header or footer so it will be ignored")
 
 def attempt_read(file_path, engine):
-        try:
-            df = pd.read_excel(file_path, engine=engine)
-            return df.to_string(), None
-        except Exception as e:
-            return None, str(e)
+    try:
+        xls = pd.ExcelFile(file_path, engine=engine)
+        all_sheets_content = []
+        for sheet_name in xls.sheet_names:
+            df = pd.read_excel(file_path, sheet_name=sheet_name, engine=engine)
+            all_sheets_content.append(df.to_string())
+        return "\n".join(all_sheets_content), None
+    except Exception as e:
+        return None, str(e)
 
 def search_in_file(file_path, search_texts):
     # Determine the engine based on file extension
