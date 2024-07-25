@@ -96,36 +96,26 @@ def write_results_to_csv(results, search_texts, output_csv, encoding='utf-8'):
         if is_file_writable(output_csv): break
         if input("File is not writable. Retry? (y/n): ").lower() != 'y': break
 
-    with open(output_csv, mode='w', newline='', encoding=encoding) as file:
-        # file.write('\ufeff')  # Write the BOM for UTF-8
-        writer = csv.writer(file, delimiter=';')
-        writer.writerow(["sep=;"])
-        header = ['Filepath', 'Error_msg'] + search_texts + ['Found']
-        writer.writerow(header)
+    # Prepare data for DataFrame
+    data = []
+    for result in results:
+        file_path, is_error, found_texts = result
+        if any(found_texts.values()) or is_error:
+            row = [file_path, is_error] + [found_texts[text] for text in search_texts] + [sum(found_texts.values())]
+            data.append(row)
 
-        filtered_results = []
-        for result in results:
-            file_path, is_error, found_texts = result  # Extract values from 'result'
-            if any(found_texts.values()) or is_error:
-                filtered_results.append(result)
+    # Create DataFrame
+    header = ['Filepath', 'Error_msg'] + search_texts + ['Hits']
+    df = pd.DataFrame(data, columns=header)
+    df.sort_values(by='Hits', ascending=False, inplace=True)
+    # Save to CSV with UTF-8 encoding and BOM
+    df.to_csv(output_csv, sep=';', encoding=encoding, index=False)
 
-        with_sum = [(file_path, is_error, found_texts, sum(found_texts.values())) for file_path, is_error, found_texts in filtered_results]
-        sorted_results = sorted(with_sum, key=lambda x: x[3], reverse=True)
-        
-        print("Saving results")
-        for file_path, is_error, found_texts, sum_value in sorted_results:
-            try:
-                row = [file_path, is_error] + [found_texts[text] for text in search_texts] + [sum_value]
-            except Exception as e:
-                print(f"Could not print one row: {e}")
-            writer.writerow(row)
-        print("Done")
+    hits_count = sum(1 for _, is_error, found_texts in results if not is_error and any(found_texts.values()))
+    errors_count = sum(1 for _, is_error, _ in results if is_error)
 
-        hits_count = sum(1 for _, is_error, found_texts, _ in sorted_results if not is_error and any(found_texts.values()))
-        errors_count = sum(1 for _, is_error, _, _ in sorted_results if is_error)
-        total_lines = len(sorted_results)
+    print(f"Total files with hits: {hits_count}, files with errors: {errors_count}")
 
-        print(f"Total files with hits: {hits_count}, files with errors: {errors_count}, total lines: {total_lines}")
 
 def read_config(file_name):
     with open(file_name, 'r', encoding = 'utf-8') as file:
